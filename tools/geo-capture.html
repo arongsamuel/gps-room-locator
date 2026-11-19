@@ -75,8 +75,8 @@
   <section class="card">
     <h2><span class="step">1</span>Building &amp; floor plan</h2>
     <div class="row">
-      <label class="f">Building<input id="inBuilding" placeholder="e.g. Atlas (building 104)"></label>
-      <label class="f">Floor<input id="inFloor" placeholder="e.g. 4th floor"></label>
+      <label class="f">Building<input id="inBuilding" placeholder="e.g. Main office, building B"></label>
+      <label class="f">Floor<input id="inFloor" placeholder="e.g. Floor 2"></label>
     </div>
     <div class="row" style="margin-top:10px">
       <label class="btn" for="inPlan" style="display:inline-block">Choose floor-plan image</label>
@@ -170,7 +170,7 @@
     </details>
   </section>
 
-  <p class="muted" style="text-align:center;margin:18px 0 28px">Part of the privacy-first <a href="https://github.com/arongsamuel/meeting-room-finder-live">Atlas Room Finder</a> project · <a href="https://github.com/arongsamuel/meeting-room-finder-live/blob/main/docs/ADAPT-TO-YOUR-BUILDING.md">how to adapt it</a>. This page makes no network requests.</p>
+  <p class="muted" style="text-align:center;margin:18px 0 28px">Part of the privacy-first <a href="https://github.com/arongsamuel/gps-room-locator">GPS Room Locator</a> project · <a href="https://github.com/arongsamuel/gps-room-locator/blob/main/docs/ADAPT-TO-YOUR-BUILDING.md">how to adapt it</a>. This page makes no network requests.</p>
 </main>
 <div class="toast" id="toast"></div>
 
@@ -453,7 +453,7 @@ ${p.fit?`
 Similarity fit: **${p.fit.metres_per_pixel} m/px**, plan "up" rotated **${p.fit.rotation_deg_clockwise_from_north}°** clockwise from true north${p.fit.rms_error_m!=null?`, RMS error **${p.fit.rms_error_m} m**`:""}. Plan ≈ ${p.fit.plan_size_m?p.fit.plan_size_m.join(" × ")+" m":"n/a"}.
 `:""}
 ## Task
-Create a **single self-contained \`index.html\`** room finder. Easiest route: start from the Atlas Room Finder's \`index.html\` (https://github.com/arongsamuel/meeting-room-finder-live) and replace its \`FLOOR\` and \`DEFAULT_GEO\` (see docs/ADAPT-TO-YOUR-BUILDING.md there). Keep it privacy-first with no backend:
+Create a **single self-contained \`index.html\`** room finder. Easiest route: start from GPS Room Locator's \`index.html\` (https://github.com/arongsamuel/gps-room-locator) and replace its \`FLOOR\` and \`DEFAULT_GEO\` (see docs/ADAPT-TO-YOUR-BUILDING.md there). Keep it privacy-first with no backend:
 1. **Trace the plan** into a \`FLOOR\` object (plan units: see step 2): rooms (named, enterable at the end of a route), open zones, service cores (stairs/lifts/toilets, not walkable), voids/atria (not walkable), and facilities as points. Read every room label you can. List any you can't read and ask me.
 2. **Georeference** with \`fit.room_finder\` from the package: trace in plan units = image px × \`plan_unit_scale\` (≈900 units across), set \`FLOOR.size\` = \`FLOOR_size\` and \`DEFAULT_GEO\` as given. Or re-fit from the points. Points near the outer walls are the most reliable.
 3. **Features:** room search; live location (accuracy-weighted GPS fused with step counting and compass heading in a small Kalman-style filter); heading-up map that keeps the destination in view; walking route on a grid (Dijkstra) that avoids voids, cores and other rooms.

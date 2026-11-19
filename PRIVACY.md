@@ -1,12 +1,12 @@
 # Privacy
 
-Atlas Room Finder is built so that **your location never leaves your device**. This document describes exactly which data exists, where it lives, and who could ever see it. It's written so you can check every claim against the source code.
+GPS Room Locator is built so that **your location never leaves your device**. This document describes exactly which data exists, where it lives, and who could ever see it. It's written so you can check every claim against the source code.
 
 ## Short version
 
 - Your position (GPS, compass, step counts) is processed **only in your browser**, and is **never sent, uploaded or logged** anywhere.
 - No location history is kept. When you turn live location off or close the page, the position is gone.
-- No accounts, analytics, ads, cookies for tracking, or third-party scripts.
+- No accounts, analytics, ads or tracking cookies.
 - The optional Outlook feature talks **directly** to Microsoft and only reads your own meetings for today.
 
 ## Data flow
@@ -34,7 +34,6 @@ Atlas Room Finder is built so that **your location never leaves your device**. T
 | Loading the page from the host | When you open it | Download the static file | No |
 | `login.microsoftonline.com` | Only if Outlook is configured **and** you tap 📅 | Sign in (OAuth 2.0 + PKCE, no secret) | No |
 | `graph.microsoft.com/v1.0/me/calendarView` | Only when signed in to Outlook | Read today's meetings | No |
-| `res.cdn.office.net` (TeamsJS) | Only when opened **inside Microsoft Teams** | Teams integration (SRI-pinned) | No |
 
 Nothing else. You can confirm this in your browser's developer tools (Network tab), or by searching the source for `fetch(`.
 
@@ -60,4 +59,4 @@ Nothing else. You can confirm this in your browser's developer tools (Network ta
 
 ## Note on the published coordinates
 
-`index.html` contains one fixed reference point (`DEFAULT_GEO.anchorLL`). It's a spot in the open work area of a public building, used to align the floor plan with real-world coordinates. It's not a person's position.
+`index.html` contains one fixed reference point (`DEFAULT_GEO.anchorLL`), used to align the floor plan with real-world coordinates. In this repository it's a **placeholder** for the made-up demo building. In a real deployment it's a point in the building (usually a corner), never a person's position.

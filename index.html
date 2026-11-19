@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f3b2c">
-<title>Atlas Room Finder · 4th floor</title>
+<title>GPS Room Locator · Demo Office</title>
 <style>
   :root{
     --ink:#1b2420; --muted:#5d6b64; --bg:#f3f1ea; --card:#fff; --line:#d8d4c8;
@@ -66,10 +66,10 @@
 </head>
 <body>
 <header>
-  <h1>Atlas · 4th floor room finder</h1>
-  <div class="sub">Wageningen Campus · building 104</div>
+  <h1>Demo Office · Floor 2</h1>
+  <div class="sub">GPS Room Locator · demo building</div>
   <div class="search">
-    <input id="q" type="search" placeholder="Find a room (e.g. Lignum, pantry, exit)…" autocomplete="off">
+    <input id="q" type="search" placeholder="Find a room (e.g. Meeting B, kitchen, exit)…" autocomplete="off">
     <div class="results" id="results"></div>
   </div>
 </header>
@@ -102,7 +102,7 @@
 
 <script>
 /* =====================================================================
-   FLOOR DATA  —  plan units are arbitrary (here: an 889 × 885 square;
+   FLOOR DATA  —  plan units are arbitrary (here: a 900 × 560 demo floor;
    for a new building, simply use the floor-plan image's pixels). Set FLOOR.size.
    (0,0) = top-left corner of the printed plan, y grows downward.
    Edit / add rooms here. "kind": room | zone | poi
@@ -119,66 +119,41 @@ function hexPods(list){
   return out;
 }
 const FLOOR = {
-  name: "4th floor",
-  size: [889, 885],
-  // Light-blue = flex workplaces, orange = open work zone, dark blue = lounge,
-  // green = corridor / meeting rooms, red/grey = service cores.
+  name: "Floor 2",
+  size: [900, 560],
+  // DEMO BUILDING — a made-up office floor that shows the features
+  // (rooms, open zones, a lightwell void, a stair/lift core, routing around them).
+  // Replace with your own building: see docs/ADAPT-TO-YOUR-BUILDING.md
   shapes: [
     // background zones (draw order matters)
-    {id:"flex-nw", name:"Flex workplaces (NW)", kind:"zone", fill:"#a9c4e4", r:[0,5,209,365]},
-    {id:"flex-ne", name:"Flex workplaces (NE)", kind:"zone", fill:"#a9c4e4", r:[667,0,222,375]},
-    {id:"open-n",  name:"Open work zone (north, hexagon tables)", kind:"zone", fill:"#e2892a", r:[209,5,458,255]},
-    {id:"open-n2", name:null, kind:"deco", fill:"#e2892a", r:[122,220,635,40]},
-    {id:"lounge-w",name:"Lounge (west)", kind:"zone", fill:"#2e64ad", r:[5,370,132,185]},
-    {id:"lounge-e",name:"Lounge (east)", kind:"zone", fill:"#2e64ad", r:[757,375,127,185]},
-    {id:"blue-w",  name:null, kind:"deco", fill:"#2e64ad", r:[102,555,40,315]},
-    {id:"blue-e",  name:null, kind:"deco", fill:"#2e64ad", r:[742,560,40,320]},
-    {id:"south",   name:"South seating area", kind:"zone", fill:"#2e64ad", r:[102,660,675,210]},
-    {id:"corr",    name:"Corridor around atrium", kind:"deco", fill:"#69983b", r:[137,260,620,400]},
-    {id:"atrium",  name:"Atrium (open void)", kind:"atrium", fill:"#ffffff", r:[252,260,373,370]},
-    {id:"green-s", name:null, kind:"deco", fill:"#69983b", r:[225,660,135,115]},
-    {id:"tribune", name:"Stair seating / tribune", kind:"zone", fill:"#69983b", r:[359,665,153,150], stripes:true},
-    // focus rooms F1–F10 (from the annotated printout, 2026-11-17)
-    {id:"f1",  name:"F1",  kind:"room", focus:true, fill:"#f4f4f2", r:[90,142,119,78]},
-    {id:"f8",  name:"F8",  kind:"room", focus:true, fill:"#f4f4f2", r:[667,142,123,78]},
-    {id:"f9",  name:"F9",  kind:"room", focus:true, fill:"#a9c4e4", r:[757,295,63,75]},
-    {id:"f10", name:"F10", kind:"room", focus:true, fill:"#a9c4e4", r:[820,295,62,75]},
-    ...hexPods([[352,182,"f2","f3"],[437,150,"f4","f5"],[522,182,"f6","f7"]]),
-    // project rooms O4AD1–O4AD5
-    {id:"o4ad2", name:"O4AD2", kind:"room", meet:true, fill:"#a9c4e4", r:[5,293,95,75]},
-    {id:"o4ad3", name:"O4AD3", kind:"room", meet:true, fill:"#e2892a", r:[209,5,80,95]},
-    {id:"o4ad4", name:"O4AD4", kind:"room", meet:true, fill:"#e2892a", r:[590,5,77,95]},
-    {id:"room-sw", name:"Small room (south-west)", kind:"room", fill:"#f4f4f2", r:[137,660,88,115]},
-    {id:"room-se", name:"Small room (south-east)", kind:"room", fill:"#f4f4f2", r:[662,665,75,80]},
-    {id:"room-se2",name:"Small green room (south-east)", kind:"room", fill:"#69983b", r:[662,745,75,60]},
-    // service cores
-    {id:"cw1", kind:"core", fill:"#a8413a", r:[134,270,78,110]},
-    {id:"cw2", kind:"core", fill:"#8c8478", r:[134,380,78,100]},
-    {id:"cw3", kind:"core", fill:"#a8413a", r:[134,480,78,70]},
-    {id:"cw4", kind:"core", fill:"#3d3d42", r:[134,550,78,60]},
-    {id:"ce1", kind:"core", fill:"#3d3d42", r:[665,270,80,65]},
-    {id:"ce2", kind:"core", fill:"#a8413a", r:[665,335,80,65]},
-    {id:"ce3", kind:"core", fill:"#8c8478", r:[665,400,80,107]},
-    {id:"ce4", kind:"core", fill:"#a8413a", r:[665,507,80,113]},
-    // named meeting rooms
-    {id:"tempus", name:"Tempus", kind:"room", meet:true, fill:"#69983b", r:[10,553,94,72]},
-    {id:"o4ad1", name:"O4AD1", kind:"room", meet:true, fill:"#69983b", r:[10,625,94,75]},
-    {id:"pluvia", name:"Pluvia", kind:"room", meet:true, fill:"#69983b", r:[10,700,94,85]},
-    {id:"arbor",  name:"Arbor",  kind:"room", meet:true, fill:"#69983b", r:[10,785,94,82]},
-    {id:"lignum", name:"Lignum", kind:"room", meet:true, fill:"#69983b", r:[777,560,98,72]},
-    {id:"o4ad5", name:"O4AD5", kind:"room", meet:true, fill:"#69983b", r:[777,632,98,78]},
-    {id:"ferrum", name:"Ferrum", kind:"room", meet:true, fill:"#69983b", r:[777,710,98,75]},
-    {id:"solei",  name:"SoLEI",  kind:"room", meet:true, fill:"#69983b", r:[777,785,98,95]},
+    {id:"corridor",    name:"Corridor",          kind:"zone", fill:"#cfe3b8", r:[0,236,900,88]},
+    {id:"quiet",       name:"Quiet zone",        kind:"zone", fill:"#e8e2cf", r:[324,114,236,122]},
+    {id:"lounge",      name:"Lounge & kitchen",  kind:"zone", fill:"#f2c48d", r:[760,0,140,236]},
+    {id:"open-office", name:"Open office",       kind:"zone", fill:"#a9c4e4", r:[0,324,540,236]},
+    {id:"reception",   name:"Reception area",    kind:"zone", fill:"#e9d8b4", r:[540,456,160,104]},
+    {id:"lightwell",   name:"Lightwell (void)",  kind:"atrium", fill:"#ffffff", r:[190,380,190,120]},
+    // stair & lift core (not walkable)
+    {id:"stairs", kind:"core", fill:"#a8413a", r:[544,328,76,64]},
+    {id:"lift",   kind:"core", fill:"#8c8478", r:[544,392,76,64]},
+    // meeting rooms
+    {id:"meet-a",    name:"Meeting A", kind:"room", meet:true, fill:"#69983b", r:[0,0,170,236]},
+    {id:"meet-b",    name:"Meeting B", kind:"room", meet:true, fill:"#69983b", r:[170,0,154,236]},
+    {id:"boardroom", name:"Boardroom",      kind:"room", meet:true, fill:"#2e64ad", r:[560,0,200,236]},
+    {id:"meet-c",    name:"Meeting C", kind:"room", meet:true, fill:"#69983b", r:[700,324,200,118]},
+    {id:"meet-d",    name:"Meeting D", kind:"room", meet:true, fill:"#69983b", r:[700,442,200,118]},
+    // focus rooms
+    {id:"focus-1", name:"Focus 1", kind:"room", focus:true, fill:"#f4f4f2", r:[324,0,78,114]},
+    {id:"focus-2", name:"Focus 2", kind:"room", focus:true, fill:"#f4f4f2", r:[402,0,78,114]},
+    {id:"focus-3", name:"Focus 3", kind:"room", focus:true, fill:"#f4f4f2", r:[480,0,80,114]},
+    {id:"focus-4", name:"Focus 4", kind:"room", focus:true, fill:"#f4f4f2", r:[620,328,80,64]},
+    {id:"focus-5", name:"Focus 5", kind:"room", focus:true, fill:"#f4f4f2", r:[620,392,80,64]},
   ],
-  // Points of interest (from the icons on the wall sign)
+  // Points of interest
   pois: [
-    {id:"secr",   name:"Secretariaat", icon:"🗂", p:[272,850]},
-    {id:"aid-w",  name:"First aid / alarm (west)", icon:"✚", p:[173,313]},
-    {id:"exit-w", name:"Emergency exit (west)", icon:"🚪", p:[173,437]},
-    {id:"pan-w",  name:"Pantry & waste (west)", icon:"☕", p:[173,523]},
-    {id:"pan-e",  name:"Pantry & waste (east)", icon:"☕", p:[705,382]},
-    {id:"exit-e", name:"Emergency exit (east)", icon:"🚪", p:[705,458]},
-    {id:"aid-e",  name:"First aid / alarm (east)", icon:"✚", p:[705,540]},
+    {id:"secr",    name:"Reception",                 icon:"🗂", p:[620,515]},
+    {id:"kitchen", name:"Kitchen",                   icon:"☕", p:[830,150]},
+    {id:"exit",    name:"Stairs & emergency exit",   icon:"🚪", p:[582,360]},
+    {id:"aid",     name:"First aid",                 icon:"✚", p:[40,280]},
   ]
 };
 
@@ -192,15 +167,17 @@ const FULL_VIEW=`-20 -20 ${FW+41} ${FH+45}`;
    and paste its "room_finder_DEFAULT_GEO" here.
    ===================================================================== */
 const DEFAULT_GEO = {
-  anchorPlan: [372, 46],                  // reference point on the plan (open work zone, north side)
-  anchorLL:   [51.986495, 5.667905],      // the same point in WGS84, measured with a 30 s GPS lock
-  rotDeg: -8,                             // clockwise angle of the plan's "up" from true north
-  facing: 0,                              // extra 0/90/180/270° turn (plan top = north here)
-  mPerUnit: 40/889,                       // metres per plan unit (building ≈ 40 m wide)
+  // PLACEHOLDER alignment for the demo building — replace with the values from
+  // tools/geo-capture.html ("room_finder.DEFAULT_GEO") measured at your building.
+  anchorPlan: [450, 280],                 // reference point on the plan (here: the middle)
+  anchorLL:   [52.000000, 5.000000],      // the same point in WGS84 (placeholder)
+  rotDeg: 0,                              // clockwise angle of the plan's "up" from true north
+  facing: 0,                              // extra 0/90/180/270° turn
+  mPerUnit: 50/900,                       // metres per plan unit (demo floor ≈ 50 × 31 m)
   calibrated: true
 };
-let GEO = load("rf.geo.v2", DEFAULT_GEO);
-let calPoints = load("rf.calpts.v2", [{plan:[372,46], ll:[51.986495,5.667905], acc:5}]);    // [{plan:[u,v], ll:[lat,lng], acc}]
+let GEO = load("rf.geo.v3", DEFAULT_GEO);
+let calPoints = load("rf.calpts.v3", []);    // [{plan:[u,v], ll:[lat,lng], acc}]
 
 function load(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : structuredClone(d);}catch(e){ return structuredClone(d);} }
 function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
@@ -246,7 +223,7 @@ function solveCalibration(){
       GEO.anchorPlan=midPlan; GEO.anchorLL=midLL;
     }
   }
-  GEO.calibrated=true; if(typeof fuse!=="undefined") fuse.e=null; save("rf.geo.v2",GEO); save("rf.calpts.v2",calPoints);
+  GEO.calibrated=true; if(typeof fuse!=="undefined") fuse.e=null; save("rf.geo.v3",GEO); save("rf.calpts.v3",calPoints);
 }
 
 /* =====================================================================
@@ -275,7 +252,7 @@ function drawPlan(){
     if(s.kind==="atrium"){
       el("line",{x1:x,y1:y,x2:x+w,y2:y+h,stroke:"#555","stroke-width":1.5},gPlan);
       el("line",{x1:x+w,y1:y,x2:x,y2:y+h,stroke:"#555","stroke-width":1.5},gPlan);
-      up(el("text",{x:x+w/2,y:y+h/2+40,"text-anchor":"middle",class:"zone-label"},gPlan),x+w/2,y+h/2+40).textContent="Atrium (void)";
+      up(el("text",{x:x+w/2,y:y+h/2+6,"text-anchor":"middle",class:"zone-label"},gPlan),x+w/2,y+h/2+6).textContent=s.name;
     }
     if(s.stripes){ for(let i=1;i<6;i++) el("line",{x1:x,y1:y+i*h/6,x2:x+w,y2:y+i*h/6,stroke:"#fff","stroke-width":2},gPlan); }
     if(s.meet||s.focus){
@@ -290,8 +267,7 @@ function drawPlan(){
     g.addEventListener("click",e=>{ if(!tapMode){e.stopPropagation(); autoTarget=false; selectTarget(p);} });
   }
   // zone captions
-  [["open-n","Open work zone",444,40],["flex-nw","Flex",60,60],["flex-ne","Flex",840,60],
-   ["south","South seating",600,850]].forEach(([id,txt,x,y])=>{
+  [["open-office","Open office",95,350],["quiet","Quiet zone",442,180],["lounge","Lounge",830,40],["corridor","Corridor",450,286],["reception","Reception",640,548]].forEach(([id,txt,x,y])=>{
      up(el("text",{x,y,"text-anchor":"middle",class:"zone-label"},gPlan),x,y).textContent=txt; });
 }
 drawPlan();
@@ -447,17 +423,14 @@ function startTracking(){
   startSensors();                      // first, while we're still inside the button tap (iOS)
   if(!("geolocation" in navigator)){ setStatus("This browser has no location support"); return; }
   if(!isSecureContext){ setStatus("Location needs HTTPS — host this page on an https:// address"); return; }
-  watchId=navigator.geolocation.watchPosition(addFix,async err=>{
-    if(inTeams && await teamsGeoFallback()) return;
-    setStatus(err.code===1?(inTeams?"Location is off for this app — in Teams, open the app's settings → App permissions → Location":"Location permission denied — allow it in browser settings"):"Location unavailable: "+err.message);
+  watchId=navigator.geolocation.watchPosition(addFix,err=>{
+    setStatus(err.code===1?"Location permission denied — allow it in browser settings":"Location unavailable: "+err.message);
   },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
-  setTimeout(()=>{ if(watchId!==null && !lastRaw && inTeams) teamsGeoFallback(); },8000);
   const bl=document.getElementById("bLocate"); bl.classList.add("on"); bl.textContent="Turn live location off";
   setStatus("");
 }
 function stopTracking(){
   if(watchId!==null) navigator.geolocation.clearWatch(watchId);
-  if(teamsGeoTimer){ clearInterval(teamsGeoTimer); teamsGeoTimer=null; }
   watchId=null; you=null; fixes=[]; disp=null; fuse.e=fuse.n=fuse.v=null;
   const bl=document.getElementById("bLocate"); bl.classList.remove("on"); bl.textContent="Turn live location on";
   render(); setStatus("");
@@ -762,41 +735,6 @@ svg.addEventListener("click",evt=>{
 });
 
 /* =====================================================================
-   MICROSOFT TEAMS  —  runs as a personal app (tab) inside Teams.
-   The Teams library is only loaded when the page is actually opened in Teams
-   (or in its sign-in pop-up), so normal browser visits load nothing extra.
-   ===================================================================== */
-let inTeams=false;
-const pageQ=new URLSearchParams(location.search);
-const pkcePopup=(()=>{ try{ return !!JSON.parse(sessionStorage.getItem("ms.pkce")||"{}").popup; }catch(e){ return false; } })();
-const maybeTeams = window.self!==window.top || /Teams\//i.test(navigator.userAgent) || pageQ.get("auth")==="start" || pkcePopup;
-const teamsReady = !maybeTeams ? Promise.resolve(false) : new Promise(res=>{
-  const sc=document.createElement("script");
-  sc.src="https://res.cdn.office.net/teams-js/2.55.0/js/MicrosoftTeams.min.js";
-  sc.integrity="sha384-qOOENVJGWr7UF7wvgyycjvq3sZen4SEYQwZMKqpquvV/PNMtSJb3VGZ/sAIKsZDw";   // verified against the npm package
-  sc.crossOrigin="anonymous";
-  sc.onload=()=>{
-    const t=setTimeout(()=>res(false),3000);
-    microsoftTeams.app.initialize().then(()=>{ clearTimeout(t); inTeams=true; document.body.classList.add("teams"); res(true); })
-      .catch(()=>{ clearTimeout(t); res(false); });
-  };
-  sc.onerror=()=>res(false);
-  document.head.appendChild(sc);
-});
-// Teams mobile may not pass browser GPS through; fall back to the Teams location API
-let teamsGeoTimer=null;
-async function teamsGeoFallback(){
-  if(teamsGeoTimer || !(await teamsReady)) return false;
-  const geo=microsoftTeams.geoLocation;
-  if(!geo || !geo.isSupported || !geo.isSupported()) return false;
-  const poll=()=>geo.getCurrentLocation().then(l=>{
-      if(watchId!==null) addFix({coords:{latitude:l.latitude, longitude:l.longitude, accuracy:l.accuracy||15}}); })
-    .catch(()=>{});
-  poll(); teamsGeoTimer=setInterval(poll,3000);
-  return true;
-}
-
-/* =====================================================================
    OUTLOOK CALENDAR  —  next meeting → room on this floor
    Uses Microsoft Graph with sign-in (OAuth 2.0 code flow + PKCE, no library).
    Fill in MS.clientId after registering the app (see setup notes);
@@ -812,10 +750,10 @@ const MS_REDIRECT = location.origin + location.pathname;
 const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 const rnd = n => b64url(crypto.getRandomValues(new Uint8Array(n)));
 
-async function msLogin(popup){
+async function msLogin(){
   const verifier=rnd(48), state=rnd(16);
   const challenge=b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
-  try{ sessionStorage.setItem("ms.pkce", JSON.stringify({verifier,state,hash:location.hash,popup:!!popup})); }catch(e){}
+  try{ sessionStorage.setItem("ms.pkce", JSON.stringify({verifier,state,hash:location.hash})); }catch(e){}
   location.href = `${MS_AUTH()}/authorize?` + new URLSearchParams({
     client_id:MS.clientId, response_type:"code", redirect_uri:MS_REDIRECT, response_mode:"query",
     scope:MS.scopes, code_challenge:challenge, code_challenge_method:"S256", state, prompt:"select_account"
@@ -837,20 +775,8 @@ async function msHandleRedirect(){
   history.replaceState(null,"",MS_REDIRECT+(saved.hash||""));          // clean the URL
   if(q.has("error")){ setStatus("Outlook sign-in: "+(q.get("error_description")||q.get("error"))); return; }
   if(q.get("state")!==saved.state){ setStatus("Outlook sign-in was interrupted — tap 📅 again"); return; }
-  try{
-    const tok=await msTokenRequest({grant_type:"authorization_code", code:q.get("code"), redirect_uri:MS_REDIRECT, code_verifier:saved.verifier});
-    if(saved.popup && await teamsReady){ microsoftTeams.authentication.notifySuccess(JSON.stringify(tok)); return "popup"; }
-  }catch(e){
-    if(saved.popup && await teamsReady){ microsoftTeams.authentication.notifyFailure(e.message); return "popup"; }
-    setStatus("Outlook sign-in: "+e.message);
-  }
-}
-async function msSignIn(){
-  if(!(await teamsReady)) return msLogin(false);
-  try{
-    const res=await microsoftTeams.authentication.authenticate({url:MS_REDIRECT+"?auth=start", width:600, height:640});
-    save("ms.tok", JSON.parse(res)); refreshCalendar(false);
-  }catch(e){ setStatus("Outlook sign-in: "+(e.message||e)); }
+  try{ await msTokenRequest({grant_type:"authorization_code", code:q.get("code"), redirect_uri:MS_REDIRECT, code_verifier:saved.verifier}); }
+  catch(e){ setStatus("Outlook sign-in: "+e.message); }
 }
 async function msAccessToken(){
   const t=load("ms.tok", null);
@@ -900,14 +826,14 @@ calEl.onclick=()=>{ if(nextMeeting && nextMeeting.room){ autoTarget=true; select
 
 async function refreshCalendar(interactive){
   const token=await msAccessToken();
-  if(!token){ if(interactive) msSignIn(); return; }
+  if(!token){ if(interactive) msLogin(); return; }
   const now=new Date(), end=new Date(now); end.setHours(23,59,59,0);
   const url="https://graph.microsoft.com/v1.0/me/calendarView?"+new URLSearchParams({
     startDateTime:new Date(now-60*60*1000).toISOString(), endDateTime:end.toISOString(),
     $select:"subject,start,end,location,locations,isAllDay,isCancelled", $orderby:"start/dateTime", $top:"30"});
   try{
     const r=await fetch(url,{headers:{Authorization:"Bearer "+token, Prefer:'outlook.timezone="UTC"'}});
-    if(r.status===401){ save("ms.tok",null); if(interactive) msSignIn(); return; }
+    if(r.status===401){ save("ms.tok",null); if(interactive) msLogin(); return; }
     const j=await r.json();
     if(!r.ok) throw new Error(j.error?.message||r.status);
     handleEvents((j.value||[]).filter(e=>!e.isCancelled && !e.isAllDay));
@@ -917,10 +843,7 @@ async function refreshCalendar(interactive){
 if(MS.clientId){
   bCal.style.display="";
   bCal.onclick=()=>refreshCalendar(true);
-  if(pageQ.get("auth")==="start"){                          // Teams sign-in pop-up: go straight to Microsoft
-    document.body.innerHTML='<p style="font:15px system-ui;padding:24px">Signing in to Microsoft…</p>';
-    teamsReady.then(()=>msLogin(true));
-  } else msHandleRedirect().then(r=>{ if(r!=="popup") refreshCalendar(false); });
+  msHandleRedirect().then(()=>refreshCalendar(false));
   setInterval(()=>refreshCalendar(false), 5*60*1000);       // keep it current
 }
 
@@ -933,16 +856,16 @@ if(location.hash==="#calendar-demo"){
   const at=min=>new Date(Date.now()+min*60000).toISOString().slice(0,-1);   // Graph-style UTC time
   const ev=(subject,from,to,where)=>({subject,start:{dateTime:at(from)},end:{dateTime:at(to)},location:{displayName:where},locations:[]});
   handleEvents([
-    ev("Stand-up",-60,-30,"Atlas 104 - O4AD3"),
-    ev("Coffee with Sam",10,25,"Orion - Restaurant"),
-    ev("Project sync (demo)",20,80,"Atlas 104 - Lignum (12p)"),
-    ev("Deep work (demo)",90,180,"Atlas 104 - F5"),
+    ev("Stand-up",-60,-30,"Floor 2 - Meeting A"),
+    ev("Coffee with Sam",10,25,"Other building - Café"),
+    ev("Project sync (demo)",20,80,"Floor 2 - Meeting C (10p)"),
+    ev("Deep work (demo)",90,180,"Floor 2 - Focus 2"),
   ]);
   calEl.title="Demo meetings — not your real calendar";
   setInterval(()=>showMeeting(),60000);
 }
 
-// Open a room from the URL, e.g. index.html#lignum
+// Open a room from the URL, e.g. index.html#meet-c
 const fromHash=ALL.find(s=>"#"+s.id===location.hash); if(fromHash) selectTarget(fromHash);
 render();
 </script>

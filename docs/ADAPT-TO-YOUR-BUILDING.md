@@ -95,12 +95,11 @@ const DEFAULT_GEO = {
 };
 ```
 
-Then bump the storage key (`rf.geo.v2` → `rf.geo.v3`), so phones that opened an older version pick up the new alignment.
+Then bump the storage key (e.g. `rf.geo.v3` → `rf.geo.v4`), so phones that opened an older version pick up the new alignment.
 
 ### Also update
 
 - the header text (`<h1>` and subtitle) and `<title>`,
-- the Teams manifest (`teams/manifest.json`): name, URLs and `validDomains`. Generate a new `id` (any GUID) and bump `version`,
 - `ROOM_MATCH`, if your calendar uses different room names. It matches room `name`s as whole words.
 
 ## Step 5: Test before you trust it
