@@ -1,4 +1,4 @@
-# GPS Room Locator
+# GPS Meeting Room Locator
 
 **A privacy-first indoor room finder that runs entirely in your phone's browser.**
 Your location never leaves your device: there is no server, no account, no tracking.
