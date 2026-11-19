@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3b2c">
+<title>Atlas Room Finder · 4th floor</title>
+<style>
+  :root{
+    --ink:#1b2420; --muted:#5d6b64; --bg:#f3f1ea; --card:#fff; --line:#d8d4c8;
+    --accent:#1f6f4a; --accent2:#e2892a; --you:#1a73e8; --target:#d93a2b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;flex-direction:column;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+  header{padding:12px 14px 8px;background:#1f3b2c;color:#fff}
+  header h1{margin:0;font-size:17px;font-weight:650;letter-spacing:.2px}
+  header .sub{font-size:12px;opacity:.75}
+  .search{position:relative;margin-top:10px}
+  .search input{width:100%;padding:11px 12px;border-radius:10px;border:0;font-size:16px;outline:none}
+  .results{position:absolute;left:0;right:0;top:46px;background:#fff;color:var(--ink);border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:50vh;overflow:auto;z-index:20;display:none}
+  .results button{display:flex;justify-content:space-between;width:100%;text-align:left;padding:11px 12px;
+    border:0;border-bottom:1px solid #eee;background:none;font-size:15px;color:inherit}
+  .results button small{color:var(--muted)}
+  main{flex:1;position:relative;overflow:hidden;touch-action:none}
+  svg#plan{width:100%;height:100%;display:block}
+  .room-label.focus{font-size:17px;fill:#1b2420;stroke:rgba(255,255,255,.6)}
+  .room-label{font-size:21px;font-weight:600;fill:#fff;pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,.35);stroke-width:2px}
+  .zone-label{font-size:17px;fill:#24312b;opacity:.75;pointer-events:none}
+  .poi-label{font-size:12px;fill:#fff;pointer-events:none}
+  .hit{cursor:pointer}
+  .hit:hover{filter:brightness(1.08)}
+  .selected{stroke:var(--target);stroke-width:6}
+  .locrow{display:flex;justify-content:center;margin-top:8px}
+  .locbtn{border:0;border-radius:999px;padding:12px 22px;font-size:15px;font-weight:650;min-width:230px;
+    background:var(--you);color:#fff;box-shadow:0 2px 8px rgba(26,115,232,.35)}
+  .locbtn.on{background:#eef1f5;color:#b3261e;box-shadow:none}
+  .hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:6px;
+    background:rgba(255,255,255,.94);color:var(--muted);font-size:12.5px;padding:6px 12px;border-radius:999px;
+    box-shadow:0 1px 6px rgba(0,0,0,.15);white-space:nowrap;pointer-events:none;transition:background .3s,color .3s}
+  .hint::before{content:"";width:14px;height:9px;border:1.6px solid currentColor;border-radius:2px;transform:perspective(20px) rotateX(35deg)}
+  .hint.show{display:flex}
+  .hint.warn{background:#fff4e0;color:#8a5300}
+  .privacy{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+  .privacy .box{background:#fff;border-radius:14px;max-width:520px;padding:18px 18px 8px;font-size:14px;line-height:1.5}
+  .privacy h2{margin:0 0 6px;font-size:18px}
+  body.show-privacy .privacy{display:flex}
+  .fab{position:absolute;right:12px;display:flex;flex-direction:column;gap:8px;bottom:12px}
+  .fab button{width:46px;height:46px;border-radius:50%;border:0;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2);
+    font-size:20px;display:grid;place-items:center;color:var(--ink)}
+  .fab button.on{background:var(--you);color:#fff}
+  /* extra bottom space so hosting banners (e.g. Netlify) don't cover the button */
+  .sheet{background:var(--card);border-top:1px solid var(--line);padding:10px 14px calc(70px + env(safe-area-inset-bottom))}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .status{font-size:13px;color:var(--muted)}
+  .cal{font-size:14px;color:var(--accent);margin-bottom:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dest{font-size:16px;font-weight:600;margin:2px 0 6px;min-height:22px}
+  .btn{border:0;border-radius:9px;padding:9px 12px;font-size:14px;font-weight:600;background:#e9efe9;color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.warn{background:#fbe9e7;color:#b3261e}
+    border-radius:10px;padding:8px 10px;font-size:13px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Atlas · 4th floor room finder</h1>
+  <div class="sub">Wageningen Campus · building 104</div>
+  <div class="search">
+    <input id="q" type="search" placeholder="Find a room (e.g. Lignum, pantry, exit)…" autocomplete="off">
+    <div class="results" id="results"></div>
+  </div>
+</header>
+
+<main id="main">
+  <svg id="plan" viewBox="-20 -20 930 930" preserveAspectRatio="xMidYMid meet"></svg>
+  <div class="hint" id="hint">Hold your phone flat for accurate direction</div>
+  <div class="fab">
+    <button id="bCal" title="Next meeting from Outlook" style="display:none">📅</button>
+    <button id="bNav" title="Heading up">➤</button>
+  </div>
+</main>
+
+<div class="privacy" id="privacy">
+  <div class="box">
+    <h2>Privacy</h2>
+    <p>Your location is worked out on your own device and is never sent anywhere or stored: GPS, compass and step counting are processed inside the app only, and nothing is kept when you turn live location off.</p>
+    <p>The app has no analytics or trackers. If you connect Outlook, it reads only today's meetings (subject, time, room) directly from Microsoft to suggest a room; no calendar data leaves your device. Your sign-in stays on your device and you can revoke it at any time in your Microsoft account.</p>
+    <p>The static website host (for example Netlify or GitHub Pages) sees normal web traffic such as your IP address, like any website. It never receives your position.</p>
+    <p><a href="#" id="privClose">Close</a></p>
+  </div>
+</div>
+<section class="sheet">
+  <div class="cal" id="cal" style="display:none"></div>
+  <div class="dest" id="dest">Tap a room or search to get directions</div>
+  <div class="status" id="status"></div>
+  <div class="locrow"><button id="bLocate" class="locbtn">Turn live location on</button></div>
+</section>
+
+
+<script>
+/* =====================================================================
+   FLOOR DATA  —  plan units are arbitrary (here: an 889 × 885 square;
+   for a new building, simply use the floor-plan image's pixels). Set FLOOR.size.
+   (0,0) = top-left corner of the printed plan, y grows downward.
+   Edit / add rooms here. "kind": room | zone | poi
+   ===================================================================== */
+// Hexagon pod split into west/east halves; r = bounding box used for routing
+function hexPods(list){
+  const W=45,H=38,out=[];
+  for(const [cx,cy,a,b] of list){
+    out.push({id:a,name:a.toUpperCase(),kind:"room",focus:true,fill:"#f2c48d",r:[cx-W,cy-H,W,2*H],
+      poly:[[cx-W,cy],[cx-W/2,cy-H],[cx,cy-H],[cx,cy+H],[cx-W/2,cy+H]]});
+    out.push({id:b,name:b.toUpperCase(),kind:"room",focus:true,fill:"#f2c48d",r:[cx,cy-H,W,2*H],
+      poly:[[cx,cy-H],[cx+W/2,cy-H],[cx+W,cy],[cx+W/2,cy+H],[cx,cy+H]]});
+  }
+  return out;
+}
+const FLOOR = {
+  name: "4th floor",
+  size: [889, 885],
+  // Light-blue = flex workplaces, orange = open work zone, dark blue = lounge,
+  // green = corridor / meeting rooms, red/grey = service cores.
+  shapes: [
+    // background zones (draw order matters)
+    {id:"flex-nw", name:"Flex workplaces (NW)", kind:"zone", fill:"#a9c4e4", r:[0,5,209,365]},
+    {id:"flex-ne", name:"Flex workplaces (NE)", kind:"zone", fill:"#a9c4e4", r:[667,0,222,375]},
+    {id:"open-n",  name:"Open work zone (north, hexagon tables)", kind:"zone", fill:"#e2892a", r:[209,5,458,255]},
+    {id:"open-n2", name:null, kind:"deco", fill:"#e2892a", r:[122,220,635,40]},
+    {id:"lounge-w",name:"Lounge (west)", kind:"zone", fill:"#2e64ad", r:[5,370,132,185]},
+    {id:"lounge-e",name:"Lounge (east)", kind:"zone", fill:"#2e64ad", r:[757,375,127,185]},
+    {id:"blue-w",  name:null, kind:"deco", fill:"#2e64ad", r:[102,555,40,315]},
+    {id:"blue-e",  name:null, kind:"deco", fill:"#2e64ad", r:[742,560,40,320]},
+    {id:"south",   name:"South seating area", kind:"zone", fill:"#2e64ad", r:[102,660,675,210]},
+    {id:"corr",    name:"Corridor around atrium", kind:"deco", fill:"#69983b", r:[137,260,620,400]},
+    {id:"atrium",  name:"Atrium (open void)", kind:"atrium", fill:"#ffffff", r:[252,260,373,370]},
+    {id:"green-s", name:null, kind:"deco", fill:"#69983b", r:[225,660,135,115]},
+    {id:"tribune", name:"Stair seating / tribune", kind:"zone", fill:"#69983b", r:[359,665,153,150], stripes:true},
+    // focus rooms F1–F10 (from the annotated printout, 2026-11-17)
+    {id:"f1",  name:"F1",  kind:"room", focus:true, fill:"#f4f4f2", r:[90,142,119,78]},
+    {id:"f8",  name:"F8",  kind:"room", focus:true, fill:"#f4f4f2", r:[667,142,123,78]},
+    {id:"f9",  name:"F9",  kind:"room", focus:true, fill:"#a9c4e4", r:[757,295,63,75]},
+    {id:"f10", name:"F10", kind:"room", focus:true, fill:"#a9c4e4", r:[820,295,62,75]},
+    ...hexPods([[352,182,"f2","f3"],[437,150,"f4","f5"],[522,182,"f6","f7"]]),
+    // project rooms O4AD1–O4AD5
+    {id:"o4ad2", name:"O4AD2", kind:"room", meet:true, fill:"#a9c4e4", r:[5,293,95,75]},
+    {id:"o4ad3", name:"O4AD3", kind:"room", meet:true, fill:"#e2892a", r:[209,5,80,95]},
+    {id:"o4ad4", name:"O4AD4", kind:"room", meet:true, fill:"#e2892a", r:[590,5,77,95]},
+    {id:"room-sw", name:"Small room (south-west)", kind:"room", fill:"#f4f4f2", r:[137,660,88,115]},
+    {id:"room-se", name:"Small room (south-east)", kind:"room", fill:"#f4f4f2", r:[662,665,75,80]},
+    {id:"room-se2",name:"Small green room (south-east)", kind:"room", fill:"#69983b", r:[662,745,75,60]},
+    // service cores
+    {id:"cw1", kind:"core", fill:"#a8413a", r:[134,270,78,110]},
+    {id:"cw2", kind:"core", fill:"#8c8478", r:[134,380,78,100]},
+    {id:"cw3", kind:"core", fill:"#a8413a", r:[134,480,78,70]},
+    {id:"cw4", kind:"core", fill:"#3d3d42", r:[134,550,78,60]},
+    {id:"ce1", kind:"core", fill:"#3d3d42", r:[665,270,80,65]},
+    {id:"ce2", kind:"core", fill:"#a8413a", r:[665,335,80,65]},
+    {id:"ce3", kind:"core", fill:"#8c8478", r:[665,400,80,107]},
+    {id:"ce4", kind:"core", fill:"#a8413a", r:[665,507,80,113]},
+    // named meeting rooms
+    {id:"tempus", name:"Tempus", kind:"room", meet:true, fill:"#69983b", r:[10,553,94,72]},
+    {id:"o4ad1", name:"O4AD1", kind:"room", meet:true, fill:"#69983b", r:[10,625,94,75]},
+    {id:"pluvia", name:"Pluvia", kind:"room", meet:true, fill:"#69983b", r:[10,700,94,85]},
+    {id:"arbor",  name:"Arbor",  kind:"room", meet:true, fill:"#69983b", r:[10,785,94,82]},
+    {id:"lignum", name:"Lignum", kind:"room", meet:true, fill:"#69983b", r:[777,560,98,72]},
+    {id:"o4ad5", name:"O4AD5", kind:"room", meet:true, fill:"#69983b", r:[777,632,98,78]},
+    {id:"ferrum", name:"Ferrum", kind:"room", meet:true, fill:"#69983b", r:[777,710,98,75]},
+    {id:"solei",  name:"SoLEI",  kind:"room", meet:true, fill:"#69983b", r:[777,785,98,95]},
+  ],
+  // Points of interest (from the icons on the wall sign)
+  pois: [
+    {id:"secr",   name:"Secretariaat", icon:"🗂", p:[272,850]},
+    {id:"aid-w",  name:"First aid / alarm (west)", icon:"✚", p:[173,313]},
+    {id:"exit-w", name:"Emergency exit (west)", icon:"🚪", p:[173,437]},
+    {id:"pan-w",  name:"Pantry & waste (west)", icon:"☕", p:[173,523]},
+    {id:"pan-e",  name:"Pantry & waste (east)", icon:"☕", p:[705,382]},
+    {id:"exit-e", name:"Emergency exit (east)", icon:"🚪", p:[705,458]},
+    {id:"aid-e",  name:"First aid / alarm (east)", icon:"✚", p:[705,540]},
+  ]
+};
+
+const [FW,FH]=FLOOR.size;                 // plan size in plan units
+const FULL_VIEW=`-20 -20 ${FW+41} ${FH+45}`;
+
+/* =====================================================================
+   GEO-REFERENCE
+   Maps plan units <-> real-world metres (a similarity transform).
+   To adapt to another building, measure points with tools/geo-capture.html
+   and paste its "room_finder_DEFAULT_GEO" here.
+   ===================================================================== */
+const DEFAULT_GEO = {
+  anchorPlan: [372, 46],                  // reference point on the plan (open work zone, north side)
+  anchorLL:   [51.986495, 5.667905],      // the same point in WGS84, measured with a 30 s GPS lock
+  rotDeg: -8,                             // clockwise angle of the plan's "up" from true north
+  facing: 0,                              // extra 0/90/180/270° turn (plan top = north here)
+  mPerUnit: 40/889,                       // metres per plan unit (building ≈ 40 m wide)
+  calibrated: true
+};
+let GEO = load("rf.geo.v2", DEFAULT_GEO);
+let calPoints = load("rf.calpts.v2", [{plan:[372,46], ll:[51.986495,5.667905], acc:5}]);    // [{plan:[u,v], ll:[lat,lng], acc}]
+
+function load(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : structuredClone(d);}catch(e){ return structuredClone(d);} }
+function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+const R_LAT = 110540, R_LNG = () => 111320 * Math.cos(GEO.anchorLL[0]*Math.PI/180);
+const theta = () => (GEO.rotDeg + GEO.facing) * Math.PI/180;
+
+// lat/lng -> metres east/north of anchor
+function llToEN([lat,lng]){ return [(lng-GEO.anchorLL[1])*R_LNG(), (lat-GEO.anchorLL[0])*R_LAT]; }
+function enToLL([e,n]){ return [GEO.anchorLL[0]+n/R_LAT, GEO.anchorLL[1]+e/R_LNG()]; }
+// plan -> E/N metres
+function planToEN([u,v]){
+  const du=u-GEO.anchorPlan[0], up=-(v-GEO.anchorPlan[1]), t=theta(), s=GEO.mPerUnit;
+  return [s*(du*Math.cos(t)+up*Math.sin(t)), s*(-du*Math.sin(t)+up*Math.cos(t))];
+}
+function enToPlan([e,n]){
+  const t=theta(), s=GEO.mPerUnit;
+  const du=(e*Math.cos(t)-n*Math.sin(t))/s, up=(e*Math.sin(t)+n*Math.cos(t))/s;
+  return [GEO.anchorPlan[0]+du, GEO.anchorPlan[1]-up];
+}
+const llToPlan = ll => enToPlan(llToEN(ll));
+const planToLL = p => enToLL(planToEN(p));
+
+// Re-solve geo-reference from calibration points
+function solveCalibration(){
+  if(!calPoints.length) return;
+  const p1=calPoints[0];
+  if(calPoints.length===1){
+    GEO.anchorPlan=p1.plan.slice(); GEO.anchorLL=p1.ll.slice();
+  } else {
+    const p2=calPoints[calPoints.length-1];
+    GEO.anchorPlan=p1.plan.slice(); GEO.anchorLL=p1.ll.slice();
+    const b=llToEN(p2.ll);                                 // metres
+    const a=[p2.plan[0]-p1.plan[0], -(p2.plan[1]-p1.plan[1])]; // plan units, y-up
+    const la=Math.hypot(...a), lb=Math.hypot(...b);
+    if(la>80 && lb>3){                                     // only trust well-separated points
+      GEO.mPerUnit = Math.min(Math.max(lb/la, 15/FW), 300/FW); // clamp to a sane building size
+      const t = Math.atan2(a[1],a[0]) - Math.atan2(b[1],b[0]);
+      GEO.rotDeg = t*180/Math.PI; GEO.facing = 0;
+      // put anchor at midpoint of the two pairs to spread GPS error
+      const midPlan=[(p1.plan[0]+p2.plan[0])/2,(p1.plan[1]+p2.plan[1])/2];
+      const midLL=[(p1.ll[0]+p2.ll[0])/2,(p1.ll[1]+p2.ll[1])/2];
+      GEO.anchorPlan=midPlan; GEO.anchorLL=midLL;
+    }
+  }
+  GEO.calibrated=true; if(typeof fuse!=="undefined") fuse.e=null; save("rf.geo.v2",GEO); save("rf.calpts.v2",calPoints);
+}
+
+/* =====================================================================
+   DRAWING
+   ===================================================================== */
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById("plan");
+const el=(tag,attrs={},parent=svg)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent.appendChild(e);return e;};
+const center = s => s.p ? s.p : [s.r[0]+s.r[2]/2, s.r[1]+s.r[3]/2];
+
+const gWorld=el("g");
+const gPlan=el("g",{},gWorld), gOverlay=el("g",{},gWorld), gYou=el("g",{},gWorld);
+const UPRIGHT=[]; const up=(e,x,y,g)=>{UPRIGHT.push({e,x,y,g}); return e;};
+const mainEl=document.getElementById("main");
+const shapeEls={};
+function drawPlan(){
+  el("rect",{x:0,y:0,width:FW,height:FH,fill:"#fff",stroke:"#9aa5b5","stroke-width":4,rx:2},gPlan);
+  for(const s of FLOOR.shapes){
+    const [x,y,w,h]=s.r;
+    const r = s.poly
+      ? el("polygon",{points:s.poly.map(p=>p.join(",")).join(" "),fill:s.fill,stroke:"rgba(255,255,255,.95)","stroke-width":3},gPlan)
+      : el("rect",{x,y,width:w,height:h,fill:s.fill,
+          stroke: s.kind==="room"||s.stroke ? "rgba(255,255,255,.9)" : "none","stroke-width":3},gPlan);
+    if(s.name && s.kind!=="deco"){ r.classList.add("hit"); r.addEventListener("click",e=>{ if(!tapMode){e.stopPropagation(); autoTarget=false; selectTarget(s);} }); }
+    shapeEls[s.id]=r;
+    if(s.kind==="atrium"){
+      el("line",{x1:x,y1:y,x2:x+w,y2:y+h,stroke:"#555","stroke-width":1.5},gPlan);
+      el("line",{x1:x+w,y1:y,x2:x,y2:y+h,stroke:"#555","stroke-width":1.5},gPlan);
+      up(el("text",{x:x+w/2,y:y+h/2+40,"text-anchor":"middle",class:"zone-label"},gPlan),x+w/2,y+h/2+40).textContent="Atrium (void)";
+    }
+    if(s.stripes){ for(let i=1;i<6;i++) el("line",{x1:x,y1:y+i*h/6,x2:x+w,y2:y+i*h/6,stroke:"#fff","stroke-width":2},gPlan); }
+    if(s.meet||s.focus){
+      const cx = s.poly ? s.poly.reduce((a,p)=>a+p[0],0)/s.poly.length : x+w/2;
+      const t=up(el("text",{x:cx,y:y+h/2+6,"text-anchor":"middle",class:s.focus?"room-label focus":"room-label"},gPlan),cx,y+h/2); t.textContent=s.name;
+    }
+  }
+  for(const p of FLOOR.pois){
+    const g=up(el("g",{class:"hit",transform:`translate(${p.p[0]},${p.p[1]})`},gPlan),p.p[0],p.p[1],true);
+    el("circle",{r:17,fill:"#1f3b2c",stroke:"#fff","stroke-width":3},g);
+    el("text",{y:6,"text-anchor":"middle","font-size":17},g).textContent=p.icon;
+    g.addEventListener("click",e=>{ if(!tapMode){e.stopPropagation(); autoTarget=false; selectTarget(p);} });
+  }
+  // zone captions
+  [["open-n","Open work zone",444,40],["flex-nw","Flex",60,60],["flex-ne","Flex",840,60],
+   ["south","South seating",600,850]].forEach(([id,txt,x,y])=>{
+     up(el("text",{x,y,"text-anchor":"middle",class:"zone-label"},gPlan),x,y).textContent=txt; });
+}
+drawPlan();
+
+/* =====================================================================
+   SEARCH + TARGET
+   ===================================================================== */
+const ALL = [...FLOOR.shapes.filter(s=>s.name && s.kind!=="deco"), ...FLOOR.pois];
+const qEl=document.getElementById("q"), resEl=document.getElementById("results");
+function renderResults(){
+  const q=qEl.value.trim().toLowerCase();
+  const list = q ? ALL.filter(s=>s.name.toLowerCase().includes(q)) : ALL.filter(s=>s.meet||s.focus||s.icon);
+  const cat=s=>s.meet?0:s.focus?1:s.icon?2:3;
+  list.sort((a,b)=>cat(a)-cat(b)||a.name.localeCompare(b.name,undefined,{numeric:true}));
+  resEl.innerHTML="";
+  list.slice(0,30).forEach(s=>{
+    const b=document.createElement("button");
+    b.innerHTML=`<span>${s.icon?s.icon+" ":""}${s.name}</span><small>${s.meet?"meeting room":s.focus?"focus room":s.icon?"facility":s.kind}</small>`;
+    b.onclick=()=>{ autoTarget=false; selectTarget(s); qEl.value=s.name; resEl.style.display="none"; qEl.blur(); };
+    resEl.appendChild(b);
+  });
+  resEl.style.display = list.length ? "block":"none";
+}
+qEl.addEventListener("focus",renderResults);
+qEl.addEventListener("input",renderResults);
+document.addEventListener("click",e=>{ if(!e.target.closest(".search")) resEl.style.display="none"; });
+
+let target=null;
+function selectTarget(s){
+  if(typeof manualW!=="undefined") manualW=null;
+  if(target && shapeEls[target.id]) shapeEls[target.id].classList.remove("selected");
+  target=s;
+  if(shapeEls[s.id]) shapeEls[s.id].classList.add("selected");
+  location.hash = s.id;
+  render();
+}
+
+/* =====================================================================
+   LOCATION  —  GPS + compass + step counting, fused
+   ===================================================================== */
+let fixes=[];          // recent raw GPS fixes (for the coordinates box)
+let you=null;          // fused estimate {ll, acc}
+let heading=null;      // degrees from true north (smoothed)
+let watchId=null;
+let lastRaw=null, capture=null;
+
+// Accuracy-weighted mean that drops fixes much worse than the best one (indoor GPS outliers)
+function weightedMean(list){
+  if(!list.length) return null;
+  const best=Math.min(...list.map(f=>f.acc));
+  const keep=list.filter(f=>f.acc<=Math.max(best*2.5, best+8));
+  let w=0,la=0,ln=0;
+  for(const f of keep){ const wi=1/Math.max(f.acc,2)**2; w+=wi; la+=f.ll[0]*wi; ln+=f.ll[1]*wi; }
+  const m=[la/w,ln/w], kLng=111320*Math.cos(m[0]*Math.PI/180);
+  const spread=Math.sqrt(keep.reduce((s,f)=>s+((f.ll[0]-m[0])*110540)**2+((f.ll[1]-m[1])*kLng)**2,0)/keep.length);
+  return {ll:m, best, n:keep.length, total:list.length, spread};
+}
+
+/* ---------- Sensor fusion ----------
+   State: position (metres east/north of the anchor) + its variance.
+   • Each detected step moves it stepLen metres along the compass heading (dead reckoning).
+   • Each GPS fix pulls it toward the fix, weighted Kalman-style by accuracy.
+     While you stand still GPS is trusted much less, so indoor drift doesn't move the dot.
+   • The result can't sit inside the atrium void or a service core, and is kept inside the building. */
+const fuse={e:null,n:null,v:null,t:0,steps:0,lastStep:0};
+let stepLen = load("rf.step", 0.7);
+let motionLive=false;            // true once the accelerometer is delivering data
+const isMoving = () => !motionLive || Date.now()-fuse.lastStep < 2500;
+const HARD = FLOOR.shapes.filter(s=>s.kind==="atrium"||s.kind==="core");
+
+function constrain(){
+  let p=enToPlan([fuse.e,fuse.n]), changed=false;
+  for(const s of HARD){ const [x,y,w,h]=s.r;
+    if(p[0]>x&&p[0]<x+w&&p[1]>y&&p[1]<y+h){
+      const opts=[[x-6,p[1]],[x+w+6,p[1]],[p[0],y-6],[p[0],y+h+6]];
+      p=opts.reduce((b,o)=>Math.hypot(o[0]-p[0],o[1]-p[1])<Math.hypot(b[0]-p[0],b[1]-p[1])?o:b); changed=true; } }
+  // near the building → keep inside the outline
+  if(p[0]>-80&&p[0]<FW+80&&p[1]>-80&&p[1]<FH+80){
+    const q=[Math.min(Math.max(p[0],6),FW-6),Math.min(Math.max(p[1],6),FH-6)];
+    if(q[0]!==p[0]||q[1]!==p[1]){p=q;changed=true;} }
+  if(changed) [fuse.e,fuse.n]=planToEN(p);
+}
+function publish(){
+  you={ll:enToLL([fuse.e,fuse.n]), acc:Math.max(Math.sqrt(fuse.v),1.5), n:fixes.length};
+  dirty=true; statusDirty=true;
+}
+let disagree=0;                  // consecutive GPS fixes that clearly disagree with the estimate
+function resetToGPS(last){
+  // restart the estimate from live GPS: accuracy-weighted mean of the latest fixes
+  const recent = last ? fixes.slice(-last) : fixes.filter(x=>Date.now()-x.t<6000);
+  const m=weightedMean(recent.length?recent:fixes.slice(-1));
+  const p=llToEN(m.ll); fuse.e=p[0]; fuse.n=p[1]; fuse.v=Math.max(m.best,3)**2; fuse.t=Date.now(); disagree=0;
+}
+function gpsUpdate(f){
+  const m=llToEN(f.ll), now=Date.now();
+  // First fixes: place you straight from live GPS (ignore very poor first readings for a few seconds)
+  if(fuse.e===null){
+    if(f.acc>60 && fixes.length<5) return;
+    resetToGPS(); fuse.born=now; constrain(); publish(); return;
+  }
+  const dt=Math.min((now-fuse.t)/1000,10); fuse.t=now;
+  fuse.v += (isMoving()?0.5:0.2)**2*dt;                  // uncertainty grows with time
+  fuse.v = Math.max(fuse.v, 2.5**2);                      // never so confident that GPS can't correct it
+  const warm = now-fuse.born < 15000;                     // first 15 s: follow GPS closely
+  let R=(Math.max(f.acc,3)*(warm||isMoving()?1:1.8))**2;  // standing still: damp drift, but still listen
+  const d=Math.hypot(m[0]-fuse.e,m[1]-fuse.n);
+  // GPS keeps saying you're clearly elsewhere (3 fixes in a row) → you really moved: jump there
+  if(d>Math.max(2*f.acc, 8) && f.acc<40){
+    if(++disagree>=3){ resetToGPS(disagree); constrain(); publish(); return; }
+  } else disagree=0;
+  if(d>3*Math.sqrt(fuse.v+R)) R*=4;                       // a single wild fix: mostly ignore
+  const K=fuse.v/(fuse.v+R);
+  fuse.e+=K*(m[0]-fuse.e); fuse.n+=K*(m[1]-fuse.n); fuse.v=(1-K)*fuse.v;
+  constrain(); publish();
+}
+function onStep(){
+  fuse.steps++; fuse.lastStep=Date.now();
+  if(fuse.e===null || heading===null) return;
+  const h=heading*Math.PI/180;
+  fuse.e+=stepLen*Math.sin(h); fuse.n+=stepLen*Math.cos(h);
+  fuse.v+=0.2**2 + (stepLen*0.15)**2;
+  constrain(); publish();
+}
+// Step detector: peaks in smoothed acceleration magnitude above a slow baseline
+let accF=null, accBase=9.81, above=false, lastStepT=0;
+function onMotion(e){
+  const a=e.accelerationIncludingGravity; if(!a || a.x==null) return;
+  motionLive=true;
+  const mag=Math.hypot(a.x,a.y,a.z);
+  accF = accF===null ? mag : accF+0.3*(mag-accF);
+  accBase += 0.02*(accF-accBase);
+  const dev=accF-accBase, now=performance.now();
+  if(!above && dev>1.0) above=true;
+  else if(above && dev<0.15){ above=false; if(now-lastStepT>280){ lastStepT=now; onStep(); } }
+}
+
+function addFix(pos){
+  const {latitude,longitude,accuracy,altitude,altitudeAccuracy}=pos.coords;
+  const now=Date.now();
+  const f={ll:[latitude,longitude],acc:accuracy,t:now};
+  lastRaw={...f,alt:altitude,altAcc:altitudeAccuracy};
+  fixes.push(f); fixes=fixes.filter(x=>now-x.t<15000);
+  if(calCollect) calCollect.push({ll:[latitude,longitude],acc:accuracy});
+  if(capture) capture.push(f);
+  const {heading:gh,speed}=pos.coords;
+  if(headSrc!=="compass" && gh!=null && !isNaN(gh) && speed>0.6) setHeading(gh,"gps");
+  gpsUpdate(f);
+}
+
+function updateCoords(){}
+
+function startTracking(){
+  startSensors();                      // first, while we're still inside the button tap (iOS)
+  if(!("geolocation" in navigator)){ setStatus("This browser has no location support"); return; }
+  if(!isSecureContext){ setStatus("Location needs HTTPS — host this page on an https:// address"); return; }
+  watchId=navigator.geolocation.watchPosition(addFix,async err=>{
+    if(inTeams && await teamsGeoFallback()) return;
+    setStatus(err.code===1?(inTeams?"Location is off for this app — in Teams, open the app's settings → App permissions → Location":"Location permission denied — allow it in browser settings"):"Location unavailable: "+err.message);
+  },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  setTimeout(()=>{ if(watchId!==null && !lastRaw && inTeams) teamsGeoFallback(); },8000);
+  const bl=document.getElementById("bLocate"); bl.classList.add("on"); bl.textContent="Turn live location off";
+  setStatus("");
+}
+function stopTracking(){
+  if(watchId!==null) navigator.geolocation.clearWatch(watchId);
+  if(teamsGeoTimer){ clearInterval(teamsGeoTimer); teamsGeoTimer=null; }
+  watchId=null; you=null; fixes=[]; disp=null; fuse.e=fuse.n=fuse.v=null;
+  const bl=document.getElementById("bLocate"); bl.classList.remove("on"); bl.textContent="Turn live location on";
+  render(); setStatus("");
+}
+document.getElementById("bLocate").onclick=()=> watchId===null?startTracking():stopTracking();
+
+/* ---------- Compass + motion sensors ---------- */
+let sensorsOn=false, hx=null, hy=null, headSrc=null;
+function setHeading(h, src){
+  // low-pass on the unit circle: no jitter, no spin at 359°→0°
+  const r=h*Math.PI/180, k = hx===null ? 1 : 0.18;
+  hx = hx===null ? Math.sin(r) : hx+(Math.sin(r)-hx)*k;
+  hy = hy===null ? Math.cos(r) : hy+(Math.cos(r)-hy)*k;
+  heading=(Math.atan2(hx,hy)*180/Math.PI+360)%360; headSrc=src; dirty=true;
+}
+let tilted=false;
+function onOrient(e){
+  if(typeof e.beta==="number" && typeof e.gamma==="number"){
+    const t=Math.abs(e.beta)>35 || Math.abs(e.gamma)>35;      // not held roughly flat
+    if(t!==tilted){ tilted=t; dirty=true; }
+  }
+  let h=null;
+  if(typeof e.webkitCompassHeading==="number") h=e.webkitCompassHeading;           // iOS
+  else if(e.absolute && typeof e.alpha==="number") h=(360-e.alpha)%360;            // Android absolute
+  if(h===null) return;
+  setHeading((h + (screen.orientation?.angle||0))%360,"compass");
+}
+function startSensors(){
+  if(sensorsOn) return; sensorsOn=true;
+  // iOS: both permission prompts must start synchronously inside the tap
+  const asks=[];
+  if(typeof DeviceOrientationEvent!=="undefined" && typeof DeviceOrientationEvent.requestPermission==="function")
+    asks.push(DeviceOrientationEvent.requestPermission().catch(()=>{}));
+  if(typeof DeviceMotionEvent!=="undefined" && typeof DeviceMotionEvent.requestPermission==="function")
+    asks.push(DeviceMotionEvent.requestPermission().catch(()=>{}));
+  Promise.all(asks).finally(()=>{
+    window.addEventListener("deviceorientationabsolute",onOrient,true);   // Android
+    window.addEventListener("deviceorientation",onOrient,true);           // iOS
+    window.addEventListener("devicemotion",onMotion,true);                // step counting
+  });
+}
+
+/* =====================================================================
+   WALKING ROUTE  — grid path-finding that avoids the atrium void,
+   service cores and closed rooms (rooms are only entered at the end).
+   ===================================================================== */
+const CELL=Math.max(4,Math.round(Math.max(FW,FH)/90)), GW=Math.ceil(FW/CELL), GH=Math.ceil(FH/CELL), PAD=Math.round(CELL*0.4);
+const BLOCK_KINDS=new Set(["room","core","atrium"]);
+const obstacles = FLOOR.shapes.filter(s=>BLOCK_KINDS.has(s.kind) || s.stroke || s.id==="tribune");
+const blocked = new Uint8Array(GW*GH);
+const cc = i => i*CELL+CELL/2;
+for(let j=0;j<GH;j++) for(let i=0;i<GW;i++){
+  const x=cc(i), y=cc(j);
+  blocked[j*GW+i] = obstacles.some(s=>x>s.r[0]-PAD && x<s.r[0]+s.r[2]+PAD && y>s.r[1]-PAD && y<s.r[1]+s.r[3]+PAD) ? 1:0;
+}
+const isFree=(x,y)=>{ const i=Math.floor(x/CELL), j=Math.floor(y/CELL); return i>=0&&j>=0&&i<GW&&j<GH&&!blocked[j*GW+i]; };
+function nearestFree(p){
+  let best=null,bd=Infinity;
+  for(let j=0;j<GH;j++) for(let i=0;i<GW;i++){ if(blocked[j*GW+i]) continue;
+    const d=(cc(i)-p[0])**2+(cc(j)-p[1])**2; if(d<bd){bd=d;best=j*GW+i;} }
+  return best;
+}
+function goalCells(t){
+  const set=new Set();
+  if(t.r && BLOCK_KINDS.has(t.kind) || t.stroke){            // closed room: any free cell touching its walls
+    const [x,y,w,h]=t.r, m=PAD+CELL*1.2;
+    for(let j=0;j<GH;j++) for(let i=0;i<GW;i++){ const k=j*GW+i; if(blocked[k]) continue;
+      const X=cc(i),Y=cc(j); if(X>x-m&&X<x+w+m&&Y>y-m&&Y<y+h+m) set.add(k); }
+  } else if(t.p){                                              // facility in a core: free cells within reach
+    for(let j=0;j<GH;j++) for(let i=0;i<GW;i++){ const k=j*GW+i; if(blocked[k]) continue;
+      if(Math.hypot(cc(i)-t.p[0],cc(j)-t.p[1])<58) set.add(k); }
+  }
+  if(!set.size) set.add(nearestFree(center(t)));               // open zone: walk to its middle
+  return set;
+}
+// Dijkstra with a tiny binary heap (≈8k cells, a few ms)
+function shortestPath(startP, t){
+  const s = isFree(...startP) ? Math.floor(startP[1]/CELL)*GW+Math.floor(startP[0]/CELL) : nearestFree(startP);
+  const goals=goalCells(t), N=GW*GH, dist=new Float64Array(N).fill(Infinity), prev=new Int32Array(N).fill(-1);
+  const heap=[]; const push=(k,d)=>{heap.push([d,k]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;[heap[p],heap[i]]=[heap[i],heap[p]];i=p;}};
+  const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;[heap[m],heap[i]]=[heap[i],heap[m]];i=m;}}return top;};
+  dist[s]=0; push(s,0); let end=-1;
+  const D=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.4142],[1,-1,1.4142],[-1,1,1.4142],[-1,-1,1.4142]];
+  while(heap.length){
+    const [d,k]=pop(); if(d>dist[k]) continue;
+    if(goals.has(k)){ end=k; break; }
+    const i=k%GW, j=(k-i)/GW;
+    for(const [di,dj,c] of D){
+      const ni=i+di,nj=j+dj; if(ni<0||nj<0||ni>=GW||nj>=GH) continue;
+      const nk=nj*GW+ni; if(blocked[nk]) continue;
+      if(di&&dj&&(blocked[j*GW+ni]||blocked[nj*GW+i])) continue;   // no cutting corners
+      const nd=d+c; if(nd<dist[nk]){dist[nk]=nd;prev[nk]=k;push(nk,nd);}
+    }
+  }
+  if(end<0) return null;
+  const cells=[]; for(let k=end;k!==-1;k=prev[k]) cells.push([cc(k%GW),cc(Math.floor(k/GW))]);
+  cells.reverse();
+  // start from the real dot if it's on a free spot
+  const pts=[isFree(...startP)?startP:cells[0], ...cells.slice(1)];
+  // string-pulling: drop points that have a clear straight line between neighbours
+  const clear=(a,b)=>{const L=Math.hypot(b[0]-a[0],b[1]-a[1]),n=Math.ceil(L/3);
+    for(let q=1;q<n;q++){const x=a[0]+(b[0]-a[0])*q/n,y=a[1]+(b[1]-a[1])*q/n; if(!isFree(x,y)) return false;} return true;};
+  const out=[pts[0]]; let a=0;
+  while(a<pts.length-1){ let b=pts.length-1; while(b>a+1 && !clear(pts[a],pts[b])) b--; out.push(pts[b]); a=b; }
+  // final step: into the room / up to the facility
+  const tc=center(t);
+  if(t.r && (BLOCK_KINDS.has(t.kind)||t.stroke)){
+    const last=out[out.length-1], [x,y,w,h]=t.r;
+    const door=[Math.min(Math.max(last[0],x+6),x+w-6), Math.min(Math.max(last[1],y+6),y+h-6)];
+    out.push(door);
+    return {pts:out, inside:tc};
+  }
+  if(t.p) out.push(tc);
+  return {pts:out};
+}
+let routeCache={key:null, route:null};
+function getRoute(youP){
+  const key=target.id+":"+Math.round(youP[0]/CELL)+","+Math.round(youP[1]/CELL);
+  if(routeCache.key!==key) routeCache={key, route:shortestPath(youP,target)};
+  return routeCache.route;
+}
+const polyLen = pts => pts.reduce((s,p,i)=>i?s+Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1]):0,0);
+
+/* =====================================================================
+   RENDER  —  persistent "you" marker, animated; camera for heading-up
+   ===================================================================== */
+const statusEl=document.getElementById("status"), destEl=document.getElementById("dest");
+function setStatus(t){ statusEl.innerHTML=t; }
+const COMPASS=["north","north-east","east","south-east","south","south-west","west","north-west"];
+function nearestPlace(p){
+  let best=null,bd=Infinity;
+  for(const s of ALL){ if(s.kind==="atrium") continue; const c=center(s); const d=Math.hypot(c[0]-p[0],c[1]-p[1]); if(d<bd){bd=d;best=s;} }
+  return best;
+}
+const defs=el("defs",{},svg); svg.insertBefore(defs,svg.firstChild);
+defs.innerHTML=`<radialGradient id="beam" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="scale(110)">
+  <stop offset="0" stop-color="#1a73e8" stop-opacity=".85"/><stop offset=".55" stop-color="#1a73e8" stop-opacity=".35"/><stop offset="1" stop-color="#1a73e8" stop-opacity="0"/></radialGradient>`;
+const BEAM = (()=>{ const R=110,a=32*Math.PI/180; return `M0 0 L${-R*Math.sin(a)} ${-R*Math.cos(a)} A${R} ${R} 0 0 1 ${R*Math.sin(a)} ${-R*Math.cos(a)} Z`; })();
+const planAngle = () => (heading??0) - (GEO.rotDeg+GEO.facing);     // heading, clockwise from plan-up
+
+// persistent marker
+const accC=el("circle",{r:0,fill:"rgba(26,115,232,.07)",stroke:"rgba(26,115,232,.35)","stroke-width":2},gYou);
+const beamG=el("g",{},gYou); el("path",{d:BEAM,fill:"url(#beam)"},beamG);
+const dotG=el("g",{},gYou);
+el("circle",{r:17,fill:"#fff",filter:"drop-shadow(0 1px 3px rgba(0,0,0,.35))"},dotG);
+el("circle",{r:12,fill:"#1a73e8"},dotG);
+gYou.style.display="none";
+
+let disp=null, dirty=true, statusDirty=true, youPcur=null, routeCur=null, routeKey=null, pinG=null;
+let navMode=true;               // heading-up, map follows you
+const bNav=document.getElementById("bNav");
+function syncNavBtn(){ bNav.classList.toggle("on",navMode); bNav.title=navMode?"Heading up (tap for whole floor, north up)":"North up (tap for heading-up navigation)"; }
+bNav.onclick=()=>{ navMode=!navMode; manualW=null; syncNavBtn(); dirty=true; };
+syncNavBtn();
+
+function turnWord(bearing){
+  if(heading===null) return "head "+COMPASS[Math.round(bearing/45)%8];
+  const rel=((bearing-heading)%360+540)%360-180;
+  return Math.abs(rel)<25?"go straight ahead":Math.abs(rel)>150?"turn around":
+    rel>0?(rel<70?"bear right":"turn right"):(rel>-70?"bear left":"turn left");
+}
+function updateDest(){
+  if(!target) return;
+  if(!youPcur){ destEl.textContent=`${target.name} — turn on live location for directions`; return; }
+  if(!routeCur){ destEl.textContent=`${target.name} — no walkable route found`; return; }
+  const meters=polyLen(routeCur.pts)*GEO.mPerUnit;
+  if(meters<3){ destEl.textContent=`${target.name} — you're there`; return; }
+  let k=1; while(k<routeCur.pts.length-1 && Math.hypot(routeCur.pts[k][0]-youPcur[0],routeCur.pts[k][1]-youPcur[1])*GEO.mPerUnit<1.5) k++;
+  const a=planToEN(youPcur), b=planToEN(routeCur.pts[k]);
+  const bearing=(Math.atan2(b[0]-a[0],b[1]-a[1])*180/Math.PI+360)%360;
+  destEl.textContent=`${target.name} — ~${Math.round(meters)} m walk · ${turnWord(bearing)}`;
+}
+function drawRoute(){
+  gOverlay.innerHTML=""; pinG=null; routeCur=null;
+  if(!target) return;
+  const c=center(target);
+  if(youPcur){
+    routeCur=getRoute(youPcur);
+    if(routeCur){
+      const pts=[youPcur, ...routeCur.pts.slice(1)];
+      const d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+      el("path",{d,fill:"none",stroke:"#fff","stroke-width":15,"stroke-linejoin":"round","stroke-linecap":"round"},gOverlay);
+      el("path",{d,fill:"none",stroke:"#1a73e8","stroke-width":9,"stroke-linejoin":"round","stroke-linecap":"round"},gOverlay);
+      if(routeCur.inside){ const e=routeCur.pts[routeCur.pts.length-1];
+        el("line",{x1:e[0],y1:e[1],x2:c[0],y2:c[1],stroke:"#1a73e8","stroke-width":5,"stroke-dasharray":"2 9","stroke-linecap":"round"},gOverlay); }
+    }
+  }
+  pinG=el("g",{},gOverlay); pinG._x=c[0]; pinG._y=c[1];
+  el("path",{d:"M0 0 C-6 -14 -18 -20 -18 -34 A18 18 0 1 1 18 -34 C18 -20 6 -14 0 0 Z",fill:"#d93a2b",stroke:"#fff","stroke-width":3},pinG);
+  el("circle",{cx:0,cy:-34,r:6.5,fill:"#fff"},pinG);
+}
+// keep text and icons upright when the map turns
+function setUpright(a){
+  for(const u of UPRIGHT) u.e.setAttribute("transform", u.g ? `translate(${u.x},${u.y}) rotate(${a})` : (a?`rotate(${a} ${u.x} ${u.y})`:""));
+  if(pinG) pinG.setAttribute("transform",`translate(${pinG._x},${pinG._y}) rotate(${a})`);
+}
+const YOU_AT=0.74;              // dot sits ~3/4 down the screen in heading-up view
+let camW=560, manualW=null;     // current zoom (view width in plan units); manual overrides auto-fit
+let camYouAt=YOU_AT;
+function autoWidth(a, asp, youAt){
+  // smallest view that keeps the route and destination pin on screen with the dot at height youAt
+  if(!target) return 560;
+  const pts=[...(routeCur?routeCur.pts:[]), center(target)];
+  const ra=a*Math.PI/180, cs=Math.cos(ra), sn=Math.sin(ra), m=70;
+  let W=420;
+  for(const p of pts){
+    const vx=p[0]-disp[0], vy=p[1]-disp[1];
+    const x=vx*cs-vy*sn, y=vx*sn+vy*cs;                     // camera coords (y<0 = ahead)
+    W=Math.max(W, 2*(Math.abs(x)+m));
+    if(y<0) W=Math.max(W, (-y+m+40)/(youAt*asp));          // +40: pin sticks up above its point
+    else    W=Math.max(W, (y+m)/((1-youAt)*asp));
+  }
+  return W;
+}
+function updateCamera(){
+  const hint=document.getElementById("hint");
+  hint.classList.toggle("show", !!(navMode && disp));
+  hint.classList.toggle("warn", tilted);
+  const W0=mainEl.clientWidth||400, H0=mainEl.clientHeight||600, asp=H0/W0;
+  if(navMode && disp){
+    const a=heading!==null ? -planAngle() : 0;
+    // normally the dot sits low (more map ahead); if the destination is behind you, centre it instead
+    const wLow=autoWidth(a,asp,YOU_AT), wMid=autoWidth(a,asp,0.5);
+    const useMid = !manualW && wMid < wLow*0.7;
+    const wantAt = useMid ? 0.5 : YOU_AT;
+    const want = manualW ?? Math.min(useMid ? wMid : wLow, 3000);
+    camW += (want-camW)*0.15; camYouAt += (wantAt-camYouAt)*0.15;   // glide zoom and dot height
+    if(Math.abs(want-camW)>1 || Math.abs(wantAt-camYouAt)>0.003) dirty=true; else { camW=want; camYouAt=wantAt; }
+    const W=camW, H=W*asp;
+    svg.setAttribute("viewBox",`${-W/2} ${-H*camYouAt} ${W} ${H}`);
+    gWorld.setAttribute("transform",`rotate(${a}) translate(${-disp[0]},${-disp[1]})`);
+    setUpright(-a);
+  } else {
+    svg.setAttribute("viewBox",FULL_VIEW); gWorld.removeAttribute("transform"); setUpright(0);
+  }
+}
+// Pinch (touch) or ctrl/trackpad wheel zooms the heading-up view; auto-fit returns on a new room or ➤
+const pointers=new Map(); let pinch0=null;
+mainEl.addEventListener("pointerdown",e=>{ pointers.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pointers.size===2){ const [p,q]=[...pointers.values()]; pinch0={d:Math.hypot(p[0]-q[0],p[1]-q[1]), w:camW}; } });
+mainEl.addEventListener("pointermove",e=>{
+  if(!pointers.has(e.pointerId)) return; pointers.set(e.pointerId,[e.clientX,e.clientY]);
+  if(pinch0 && pointers.size===2 && navMode){ const [p,q]=[...pointers.values()];
+    const d=Math.hypot(p[0]-q[0],p[1]-q[1]); if(d>10){ manualW=Math.min(Math.max(pinch0.w*pinch0.d/d,150),2200); camW=manualW; dirty=true; } } });
+const endPtr=e=>{ pointers.delete(e.pointerId); if(pointers.size<2) pinch0=null; };
+mainEl.addEventListener("pointerup",endPtr); mainEl.addEventListener("pointercancel",endPtr);
+mainEl.addEventListener("wheel",e=>{ if(!navMode||!disp) return; e.preventDefault();
+  manualW=Math.min(Math.max((manualW??camW)*(1+e.deltaY*0.0015),150),2200); camW=manualW; dirty=true; },{passive:false});
+function updateYou(){
+  if(!disp){ gYou.style.display="none"; return; }
+  gYou.style.display="";
+  accC.setAttribute("cx",disp[0]); accC.setAttribute("cy",disp[1]); accC.setAttribute("r",you.acc/GEO.mPerUnit);
+  dotG.setAttribute("transform",`translate(${disp[0]},${disp[1]})`);
+  beamG.style.display = heading===null ? "none" : "";
+  beamG.setAttribute("transform",`translate(${disp[0]},${disp[1]}) rotate(${planAngle()})`);
+}
+function updateStatus(){ if(you) setStatus(""); }
+// full redraw (target or calibration changed)
+function render(){ routeKey=null; dirty=true; statusDirty=true; if(!you){ disp=null; youPcur=null; updateYou(); drawRoute(); updateCamera(); updateDest(); updateCoords(); } }
+
+// animation loop: glide the dot toward the fused estimate
+function tick(){
+  requestAnimationFrame(tick);
+  if(you){
+    const tgt=llToPlan(you.ll);
+    if(!disp){ disp=tgt.slice(); dirty=true; }
+    const dx=tgt[0]-disp[0], dy=tgt[1]-disp[1];
+    if(Math.hypot(dx,dy)>80){ disp=tgt.slice(); dirty=true; }          // big jump (e.g. recalibration)
+    else if(Math.abs(dx)+Math.abs(dy)>0.2){ disp[0]+=dx*0.12; disp[1]+=dy*0.12; dirty=true; }
+  }
+  if(!dirty) return;
+  dirty=false;
+  youPcur=disp;
+  if(you){
+    const key=(target?target.id:"-")+":"+Math.round(disp[0]/CELL)+","+Math.round(disp[1]/CELL);
+    if(key!==routeKey){ routeKey=key; drawRoute(); }
+    else if(routeCur && gOverlay.firstChild){            // just move the route's start with the dot
+      const pts=[disp, ...routeCur.pts.slice(1)];
+      const d=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+      gOverlay.children[0].setAttribute("d",d); gOverlay.children[1].setAttribute("d",d);
+    }
+  }
+  updateYou(); updateCamera(); updateDest();
+  if(statusDirty){ statusDirty=false; updateStatus(); }
+}
+requestAnimationFrame(tick);
+addEventListener("resize",()=>dirty=true);
+
+/* =====================================================================
+   CALIBRATION UI
+   ===================================================================== */
+let tapMode=false, calCollect=null;
+function svgPoint(evt){
+  const pt=svg.createSVGPoint(); pt.x=evt.clientX; pt.y=evt.clientY;
+  const p=pt.matrixTransform(gWorld.getScreenCTM().inverse()); return [p.x,p.y];
+}
+svg.addEventListener("click",evt=>{
+  const p=svgPoint(evt);
+  if(location.hash==="#demo"){                        // desktop testing: click = fake GPS fix
+    const ll=planToLL(p); addFix({coords:{latitude:ll[0],longitude:ll[1],accuracy:6}});
+  }
+});
+
+/* =====================================================================
+   MICROSOFT TEAMS  —  runs as a personal app (tab) inside Teams.
+   The Teams library is only loaded when the page is actually opened in Teams
+   (or in its sign-in pop-up), so normal browser visits load nothing extra.
+   ===================================================================== */
+let inTeams=false;
+const pageQ=new URLSearchParams(location.search);
+const pkcePopup=(()=>{ try{ return !!JSON.parse(sessionStorage.getItem("ms.pkce")||"{}").popup; }catch(e){ return false; } })();
+const maybeTeams = window.self!==window.top || /Teams\//i.test(navigator.userAgent) || pageQ.get("auth")==="start" || pkcePopup;
+const teamsReady = !maybeTeams ? Promise.resolve(false) : new Promise(res=>{
+  const sc=document.createElement("script");
+  sc.src="https://res.cdn.office.net/teams-js/2.55.0/js/MicrosoftTeams.min.js";
+  sc.integrity="sha384-qOOENVJGWr7UF7wvgyycjvq3sZen4SEYQwZMKqpquvV/PNMtSJb3VGZ/sAIKsZDw";   // verified against the npm package
+  sc.crossOrigin="anonymous";
+  sc.onload=()=>{
+    const t=setTimeout(()=>res(false),3000);
+    microsoftTeams.app.initialize().then(()=>{ clearTimeout(t); inTeams=true; document.body.classList.add("teams"); res(true); })
+      .catch(()=>{ clearTimeout(t); res(false); });
+  };
+  sc.onerror=()=>res(false);
+  document.head.appendChild(sc);
+});
+// Teams mobile may not pass browser GPS through; fall back to the Teams location API
+let teamsGeoTimer=null;
+async function teamsGeoFallback(){
+  if(teamsGeoTimer || !(await teamsReady)) return false;
+  const geo=microsoftTeams.geoLocation;
+  if(!geo || !geo.isSupported || !geo.isSupported()) return false;
+  const poll=()=>geo.getCurrentLocation().then(l=>{
+      if(watchId!==null) addFix({coords:{latitude:l.latitude, longitude:l.longitude, accuracy:l.accuracy||15}}); })
+    .catch(()=>{});
+  poll(); teamsGeoTimer=setInterval(poll,3000);
+  return true;
+}
+
+/* =====================================================================
+   OUTLOOK CALENDAR  —  next meeting → room on this floor
+   Uses Microsoft Graph with sign-in (OAuth 2.0 code flow + PKCE, no library).
+   Fill in MS.clientId after registering the app (see setup notes);
+   while it's empty the calendar button stays hidden.
+   ===================================================================== */
+const MS = {
+  clientId: "",                 // ← Application (client) ID from the Entra app registration
+  tenant:   "organizations",    // or your Directory (tenant) ID
+  scopes:   "openid offline_access https://graph.microsoft.com/Calendars.Read",
+};
+const MS_AUTH = () => `https://login.microsoftonline.com/${MS.tenant}/oauth2/v2.0`;
+const MS_REDIRECT = location.origin + location.pathname;
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const rnd = n => b64url(crypto.getRandomValues(new Uint8Array(n)));
+
+async function msLogin(popup){
+  const verifier=rnd(48), state=rnd(16);
+  const challenge=b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  try{ sessionStorage.setItem("ms.pkce", JSON.stringify({verifier,state,hash:location.hash,popup:!!popup})); }catch(e){}
+  location.href = `${MS_AUTH()}/authorize?` + new URLSearchParams({
+    client_id:MS.clientId, response_type:"code", redirect_uri:MS_REDIRECT, response_mode:"query",
+    scope:MS.scopes, code_challenge:challenge, code_challenge_method:"S256", state, prompt:"select_account"
+  });
+}
+async function msTokenRequest(params){
+  const r = await fetch(`${MS_AUTH()}/token`, {method:"POST",
+    headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({client_id:MS.clientId, scope:MS.scopes, ...params})});
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.error_description||j.error||"sign-in failed");
+  const tok={access:j.access_token, refresh:j.refresh_token, exp:Date.now()+(j.expires_in-120)*1000};
+  save("ms.tok", tok); return tok;
+}
+async function msHandleRedirect(){
+  const q=new URLSearchParams(location.search);
+  if(!q.has("code") && !q.has("error")) return;
+  let saved={}; try{ saved=JSON.parse(sessionStorage.getItem("ms.pkce")||"{}"); sessionStorage.removeItem("ms.pkce"); }catch(e){}
+  history.replaceState(null,"",MS_REDIRECT+(saved.hash||""));          // clean the URL
+  if(q.has("error")){ setStatus("Outlook sign-in: "+(q.get("error_description")||q.get("error"))); return; }
+  if(q.get("state")!==saved.state){ setStatus("Outlook sign-in was interrupted — tap 📅 again"); return; }
+  try{
+    const tok=await msTokenRequest({grant_type:"authorization_code", code:q.get("code"), redirect_uri:MS_REDIRECT, code_verifier:saved.verifier});
+    if(saved.popup && await teamsReady){ microsoftTeams.authentication.notifySuccess(JSON.stringify(tok)); return "popup"; }
+  }catch(e){
+    if(saved.popup && await teamsReady){ microsoftTeams.authentication.notifyFailure(e.message); return "popup"; }
+    setStatus("Outlook sign-in: "+e.message);
+  }
+}
+async function msSignIn(){
+  if(!(await teamsReady)) return msLogin(false);
+  try{
+    const res=await microsoftTeams.authentication.authenticate({url:MS_REDIRECT+"?auth=start", width:600, height:640});
+    save("ms.tok", JSON.parse(res)); refreshCalendar(false);
+  }catch(e){ setStatus("Outlook sign-in: "+(e.message||e)); }
+}
+async function msAccessToken(){
+  const t=load("ms.tok", null);
+  if(!t) return null;
+  if(Date.now()<t.exp) return t.access;
+  if(!t.refresh) return null;
+  try{ return (await msTokenRequest({grant_type:"refresh_token", refresh_token:t.refresh})).access; }
+  catch(e){ save("ms.tok", null); return null; }
+}
+
+// Room names on this floor that a meeting location can refer to
+const ROOM_MATCH = ALL.filter(s=>s.meet || s.focus || s.id==="secr")
+  .map(s=>({s, re:new RegExp(`(^|[^a-z0-9])${s.name.toLowerCase()}([^a-z0-9]|$)`,"i")}));
+const roomFor = text => (ROOM_MATCH.find(m=>m.re.test(text))||{}).s || null;
+
+const calEl=document.getElementById("cal"), bCal=document.getElementById("bCal");
+let nextMeeting=null, autoTarget=false;
+const hhmm = d => d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+
+function handleEvents(events){
+  const now=Date.now();
+  const upcoming=events.map(e=>({
+      subject:e.subject||"(no title)",
+      start:new Date(e.start.dateTime+"Z"), end:new Date(e.end.dateTime+"Z"),
+      where:[e.location?.displayName, ...(e.locations||[]).map(l=>l.displayName)].filter(Boolean).join(" · ")
+    }))
+    .filter(e=>e.end.getTime()>now && !e.isAllDay)
+    .sort((a,b)=>a.start-b.start);
+  // first meeting in a room on this floor; otherwise show the next meeting anyway
+  const hit=upcoming.find(e=>roomFor(e.where));
+  nextMeeting = hit ? {...hit, room:roomFor(hit.where)} : (upcoming[0] ? {...upcoming[0], room:null} : null);
+  showMeeting();
+}
+function showMeeting(){
+  if(!nextMeeting){ calEl.textContent="📅 No more meetings today"; calEl.style.display=""; return; }
+  const m=nextMeeting, when = m.start.getTime()<=Date.now() ? "now" : hhmm(m.start);
+  calEl.style.display="";
+  if(m.room){
+    calEl.innerHTML=`📅 <b>${when}</b> · ${escapeHtml(m.subject)} → <u>${escapeHtml(m.room.name)}</u>`;
+    if(!target || autoTarget){ autoTarget=true; selectTarget(m.room); }
+  } else {
+    calEl.innerHTML=`📅 <b>${when}</b> · ${escapeHtml(m.subject)}${m.where?` · ${escapeHtml(m.where)} (not on this floor)`:""}`;
+  }
+}
+const escapeHtml = t => t.replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+calEl.onclick=()=>{ if(nextMeeting && nextMeeting.room){ autoTarget=true; selectTarget(nextMeeting.room); } };
+
+async function refreshCalendar(interactive){
+  const token=await msAccessToken();
+  if(!token){ if(interactive) msSignIn(); return; }
+  const now=new Date(), end=new Date(now); end.setHours(23,59,59,0);
+  const url="https://graph.microsoft.com/v1.0/me/calendarView?"+new URLSearchParams({
+    startDateTime:new Date(now-60*60*1000).toISOString(), endDateTime:end.toISOString(),
+    $select:"subject,start,end,location,locations,isAllDay,isCancelled", $orderby:"start/dateTime", $top:"30"});
+  try{
+    const r=await fetch(url,{headers:{Authorization:"Bearer "+token, Prefer:'outlook.timezone="UTC"'}});
+    if(r.status===401){ save("ms.tok",null); if(interactive) msSignIn(); return; }
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error?.message||r.status);
+    handleEvents((j.value||[]).filter(e=>!e.isCancelled && !e.isAllDay));
+    bCal.classList.add("on");
+  }catch(e){ setStatus("Couldn't read calendar: "+e.message); }
+}
+if(MS.clientId){
+  bCal.style.display="";
+  bCal.onclick=()=>refreshCalendar(true);
+  if(pageQ.get("auth")==="start"){                          // Teams sign-in pop-up: go straight to Microsoft
+    document.body.innerHTML='<p style="font:15px system-ui;padding:24px">Signing in to Microsoft…</p>';
+    teamsReady.then(()=>msLogin(true));
+  } else msHandleRedirect().then(r=>{ if(r!=="popup") refreshCalendar(false); });
+  setInterval(()=>refreshCalendar(false), 5*60*1000);       // keep it current
+}
+
+const syncPrivacy=()=>document.body.classList.toggle("show-privacy",location.hash==="#privacy");
+addEventListener("hashchange",syncPrivacy); syncPrivacy();
+document.getElementById("privClose").onclick=e=>{ e.preventDefault(); history.replaceState(null,"",location.pathname+location.search); syncPrivacy(); };
+
+// Calendar demo (no sign-in): index.html#calendar-demo fills in made-up meetings for today
+if(location.hash==="#calendar-demo"){
+  const at=min=>new Date(Date.now()+min*60000).toISOString().slice(0,-1);   // Graph-style UTC time
+  const ev=(subject,from,to,where)=>({subject,start:{dateTime:at(from)},end:{dateTime:at(to)},location:{displayName:where},locations:[]});
+  handleEvents([
+    ev("Stand-up",-60,-30,"Atlas 104 - O4AD3"),
+    ev("Coffee with Sam",10,25,"Orion - Restaurant"),
+    ev("Project sync (demo)",20,80,"Atlas 104 - Lignum (12p)"),
+    ev("Deep work (demo)",90,180,"Atlas 104 - F5"),
+  ]);
+  calEl.title="Demo meetings — not your real calendar";
+  setInterval(()=>showMeeting(),60000);
+}
+
+// Open a room from the URL, e.g. index.html#lignum
+const fromHash=ALL.find(s=>"#"+s.id===location.hash); if(fromHash) selectTarget(fromHash);
+render();
+</script>
+</body>
+</html>

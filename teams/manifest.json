@@ -1,0 +1,52 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "6f088052-5d90-4223-befc-02dc6538bf11",
+  "developer": {
+    "name": "Atlas Room Finder",
+    "websiteUrl": "https://atlasroomfinder.netlify.app/",
+    "privacyUrl": "https://atlasroomfinder.netlify.app/#privacy",
+    "termsOfUseUrl": "https://atlasroomfinder.netlify.app/#privacy"
+  },
+  "name": {
+    "short": "Atlas Room Finder",
+    "full": "Atlas Room Finder \u00b7 4th floor"
+  },
+  "description": {
+    "short": "Find rooms on Atlas 4th floor and walk there with live directions.",
+    "full": "Indoor room finder for the 4th floor of Atlas (building 104), Wageningen Campus. Search meeting, project and focus rooms, see your live position with a heading-up map, and follow a walking route that avoids the atrium and closed rooms. Optionally connects to your Outlook calendar to route you to your next meeting's room. Your location is processed on your device only."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#1F3B2C",
+  "staticTabs": [
+    {
+      "entityId": "roomfinder",
+      "name": "Room finder",
+      "contentUrl": "https://atlasroomfinder.netlify.app/",
+      "websiteUrl": "https://atlasroomfinder.netlify.app/",
+      "scopes": [
+        "personal"
+      ]
+    },
+    {
+      "entityId": "about",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
+  "permissions": [
+    "identity"
+  ],
+  "devicePermissions": [
+    "geolocation"
+  ],
+  "validDomains": [
+    "atlasroomfinder.netlify.app",
+    "login.microsoftonline.com"
+  ]
+}
